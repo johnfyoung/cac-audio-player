@@ -1,19 +1,24 @@
 #!/bin/bash
 
-# scan_audio_directory.sh
-# This script scans a directory of audio files and generates a JSON file
-# in the format needed by the loadAvailableTracks function.
+# scan_audio_directory.sh - Scans audio files and generates a JSON manifest
+# Modified to follow symbolic links and handle macOS Alias files
 
 # Default values
 AUDIO_DIR="./audio"
 OUTPUT_FILE="available_tracks.json"
 SUPPORTED_EXTENSIONS=("mp3" "wav" "ogg" "m4a" "flac")
+TEMP_FILE="/tmp/audio_file_list.txt"
 
-# Check if ffprobe (ffmpeg) is installed
+# Check if we're on macOS
+ON_MACOS=false
+if [[ "$(uname)" == "Darwin" ]]; then
+    ON_MACOS=true
+fi
+
+# Check if ffprobe is installed
 if ! command -v ffprobe &> /dev/null; then
     echo "Error: ffprobe is required but not installed."
-    echo "Please install ffmpeg: sudo apt-get install ffmpeg (Ubuntu/Debian)"
-    echo "or: brew install ffmpeg (macOS with Homebrew)"
+    echo "Please install ffmpeg: brew install ffmpeg (macOS) or apt-get install ffmpeg (Linux)"
     exit 1
 fi
 
@@ -53,30 +58,50 @@ if [ ! -d "$AUDIO_DIR" ]; then
     exit 1
 fi
 
-echo "Scanning audio files in '$AUDIO_DIR'..."
+echo "Scanning audio files in '$AUDIO_DIR' (including symbolic links)..."
 
-# Start JSON array
+# First, create a list of all audio files
+echo "Finding all supported audio files..."
+> "$TEMP_FILE"  # Clear the temp file
+
+for ext in "${SUPPORTED_EXTENSIONS[@]}"; do
+    find -L "$AUDIO_DIR" -type f -name "*.$ext" >> "$TEMP_FILE"
+done
+
+# Initialize JSON file
 echo "[" > "$OUTPUT_FILE"
-
-# Initialize counter
-id=1
 first_file=true
+id=1
 
-# Function to extract metadata from audio file
-extract_metadata() {
-    local file="$1"
-    local filename=$(basename "$file")
+# Process each file
+while IFS= read -r file; do
+    echo "Processing: $file"
+    filename=$(basename "$file")
     
-    # Get artist and title using ffprobe
-    artist=$(ffprobe -loglevel error -show_entries format_tags=artist -of default=noprint_wrappers=1:nokey=1 "$file")
-    title=$(ffprobe -loglevel error -show_entries format_tags=title -of default=noprint_wrappers=1:nokey=1 "$file")
+    # For macOS Alias files - try to resolve them
+    if [ "$ON_MACOS" = true ]; then
+        file_type=$(file -b "$file")
+        if [[ "$file_type" == *"MacOS Alias"* ]]; then
+            echo "Detected macOS Alias file, attempting to resolve..."
+            resolved=$(osascript -e "tell application \"Finder\" to get the POSIX path of (original item of POSIX file \"$file\" as alias)" 2>/dev/null)
+            if [ -n "$resolved" ] && [ -f "$resolved" ]; then
+                echo "Resolved to: $resolved"
+                file="$resolved"
+            else
+                echo "Could not resolve alias, using original file path"
+            fi
+        fi
+    fi
     
-    # If title is empty, use filename without extension
+    # Try to get artist and title using ffprobe
+    artist=$(ffprobe -v quiet -show_entries format_tags=artist -of default=noprint_wrappers=1:nokey=1 "$file" 2>/dev/null)
+    title=$(ffprobe -v quiet -show_entries format_tags=title -of default=noprint_wrappers=1:nokey=1 "$file" 2>/dev/null)
+    
+    # Default values if metadata is missing
     if [ -z "$title" ]; then
         title="${filename%.*}"
     fi
     
-    # If artist is empty, use "Unknown Artist"
     if [ -z "$artist" ]; then
         artist="Unknown Artist"
     fi
@@ -85,48 +110,39 @@ extract_metadata() {
     title=$(echo "$title" | sed 's/"/\\"/g')
     artist=$(echo "$artist" | sed 's/"/\\"/g')
     
-    # Output JSON object for this file
+    # Add to JSON
     if [ "$first_file" = false ]; then
         echo "," >> "$OUTPUT_FILE"
     else
         first_file=false
     fi
     
-    echo "    {" >> "$OUTPUT_FILE"
-    echo "        \"id\": $id," >> "$OUTPUT_FILE"
-    echo "        \"title\": \"$title\"," >> "$OUTPUT_FILE"
-    echo "        \"artist\": \"$artist\"," >> "$OUTPUT_FILE"
-    echo "        \"filename\": \"$filename\"" >> "$OUTPUT_FILE"
-    echo "    }" >> "$OUTPUT_FILE"
+    # Write the JSON entry
+    cat >> "$OUTPUT_FILE" << EOF
+    {
+        "id": $id,
+        "title": "$title",
+        "artist": "$artist",
+        "filename": "$filename"
+    }
+EOF
     
-    # Increment ID
+    # Increment ID counter
     ((id++))
-}
-
-# Find all audio files in the directory and process them
-for ext in "${SUPPORTED_EXTENSIONS[@]}"; do
-    while IFS= read -r -d '' file; do
-        extract_metadata "$file"
-    done < <(find "$AUDIO_DIR" -type f -name "*.$ext" -print0)
-done
+done < "$TEMP_FILE"
 
 # Close JSON array
 echo "]" >> "$OUTPUT_FILE"
 
-# Count audio files found
+# Clean up
+rm -f "$TEMP_FILE"
+
+# Count completed files
 file_count=$((id - 1))
 echo "Found $file_count audio files. JSON data saved to '$OUTPUT_FILE'."
 
-# Help message for next steps
+# Help message
 echo ""
 echo "Next steps:"
 echo "1. Place this JSON file in your web directory"
-echo "2. Update your web page to load the tracks using fetch():"
-echo ""
-echo "fetch('$OUTPUT_FILE')"
-echo "    .then(response => response.json())"
-echo "    .then(data => {"
-echo "        availableTracks = data;"
-echo "        renderTrackList();"
-echo "    })"
-echo "    .catch(error => console.error('Error loading tracks:', error));"
+echo "2. Use fetch() to load the tracks in your web page"

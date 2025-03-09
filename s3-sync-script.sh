@@ -17,7 +17,7 @@ S3_BUCKET=${S3_BUCKET}
 HTML_FILE="index.html"
 AUDIO_DIR="./audio"
 TRACKS_JSON="available_tracks.json"
-LOGO_FILE="mossback_logo.png"
+LOGO_FILE="audio-player-logo.png"
 FAVICON="favicon.png"
 PLAYLISTS_JSON="playlists.json"
 

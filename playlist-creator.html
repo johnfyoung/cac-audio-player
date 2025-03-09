@@ -6,6 +6,10 @@
     <title>Playlist Creator</title>
     <link rel="icon" type="image/png" href="favicon.png" />
     <style>
+      :root {
+        --pl-gray: #7f8c8d;
+      }
+
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         max-width: 1000px;
@@ -32,6 +36,10 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         padding: 20px;
         flex: 1;
+      }
+
+      .hide {
+        display: none;
       }
 
       .tracks-panel {
@@ -81,7 +89,7 @@
 
       .track-artist {
         font-size: 0.9em;
-        color: #7f8c8d;
+        color: var(-pl-gray);
       }
 
       .track-actions {
@@ -161,6 +169,12 @@
         margin-top: 20px;
       }
 
+      .audio-preview-nowplaying-container {
+        font-weight: bold;
+        color: var(--pl-gray);
+        font-size: 12px;
+      }
+
       .drag-handle {
         cursor: move;
         color: #95a5a6;
@@ -180,22 +194,55 @@
         box-sizing: border-box;
       }
 
+      /* Toast messages styling */
+      .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        max-width: 300px;
+      }
+
       .message {
-        padding: 10px;
-        margin: 10px 0;
+        padding: 12px 16px;
+        margin-bottom: 10px;
         border-radius: 4px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        animation: fadeIn 0.3s, fadeOut 0.5s 2.5s forwards;
+        opacity: 0.9;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
+        to {
+          opacity: 0.9;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeOut {
+        from {
+          opacity: 0.9;
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-20px);
+        }
       }
 
       .success {
         background-color: #d4edda;
         color: #155724;
-        border: 1px solid #c3e6cb;
+        border-left: 4px solid #28a745;
       }
 
       .error {
         background-color: #f8d7da;
         color: #721c24;
-        border: 1px solid #f5c6cb;
+        border-left: 4px solid #dc3545;
       }
 
       /* Drag and drop styling */
@@ -271,10 +318,34 @@
           flex-direction: column;
         }
       }
+
+      /* Add styles for active playlists and buttons */
+      .saved-playlist-item.active {
+        background-color: #f0f8ff;
+        border-left: 3px solid #3498db;
+      }
+
+      #newPlaylistBtn {
+        background-color: #2ecc71;
+        color: white;
+        padding: 8px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        width: 100%;
+        margin-bottom: 15px;
+        transition: background-color 0.3s;
+      }
+
+      #newPlaylistBtn:hover {
+        background-color: #27ae60;
+      }
     </style>
   </head>
   <body>
     <h1>Playlist Creator</h1>
+
+    <div id="toastContainer" class="toast-container"></div>
 
     <div class="container">
       <div class="panel tracks-panel">
@@ -289,8 +360,6 @@
           />
         </div>
 
-        <div id="messageArea"></div>
-
         <ul id="trackList" class="track-list">
           <li class="track-item">
             <div class="track-info">
@@ -301,59 +370,86 @@
 
         <div class="audio-preview">
           <h3>Preview</h3>
+          <div class="audio-preview-nowplaying-container">
+            <span class="audio-preview-nowplaying"></span>
+          </div>
           <audio id="audioPreview" controls></audio>
         </div>
       </div>
 
       <div class="panel playlist-panel">
         <div class="tabs">
-          <div class="tab active" data-tab="create">Create Playlist</div>
-          <div class="tab" data-tab="saved">Saved Playlists</div>
+          <div class="tab active" data-tab="playlists">Playlists</div>
+          <div class="tab" data-tab="create">Create/Edit</div>
         </div>
 
-        <div id="createTab" class="tab-content active">
-          <div class="form-group">
-            <label for="playlistName">Playlist Name:</label>
-            <input
-              type="text"
-              id="playlistName"
-              placeholder="My Awesome Playlist"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="playlistDescription">Description:</label>
-            <textarea
-              id="playlistDescription"
-              placeholder="Description of your playlist"
-            ></textarea>
-          </div>
-
-          <h3>Playlist Tracks</h3>
-          <ul id="playlistTracks" class="playlist-tracks">
-            <li class="playlist-item empty-message">
-              <div class="track-info">
-                <div class="track-title">No tracks added yet</div>
-              </div>
-            </li>
-          </ul>
-
-          <div class="playlist-actions">
-            <button id="savePlaylistBtn">Save Playlist</button>
-            <button id="clearPlaylistBtn">Clear Playlist</button>
-            <button id="downloadPlaylistBtn">Download JSON</button>
-          </div>
-        </div>
-
-        <div id="savedTab" class="tab-content">
-          <h3>Your Saved Playlists</h3>
-          <ul id="savedPlaylists" class="saved-playlists">
+        <div id="playlistsTab" class="tab-content active">
+          <h3>Your Playlists</h3>
+          <ul id="playlistsList" class="saved-playlists">
             <li class="saved-playlist-item empty-message">
               <div class="saved-playlist-info">
-                <div class="saved-playlist-name">No saved playlists</div>
+                <div class="saved-playlist-name">No playlists</div>
               </div>
             </li>
           </ul>
+
+          <div id="activePlaylistSection" style="display: none">
+            <h3>Active Playlist: <span id="activePlaylistName"></span></h3>
+            <ul id="playlistTracks" class="playlist-tracks">
+              <li class="playlist-item empty-message">
+                <div class="track-info">
+                  <div class="track-title">No tracks added yet</div>
+                </div>
+              </li>
+            </ul>
+
+            <div class="playlist-actions">
+              <button id="editPlaylistBtn">Edit Details</button>
+              <button id="clearPlaylistBtn">Clear Tracks</button>
+              <button id="downloadPlaylistBtn">Download JSON</button>
+            </div>
+          </div>
+
+          <div class="playlist-actions" style="margin-top: 20px">
+            <button id="downloadAllPlaylistsBtn">Download All Playlists</button>
+            <button id="importPlaylistsBtn">Import Playlists</button>
+            <input
+              type="file"
+              id="playlistImportInput"
+              accept=".json"
+              style="display: none"
+            />
+          </div>
+        </div>
+
+        <div id="createTab" class="tab-content">
+          <div class="form-group create-tab-playlist-create">
+            <button id="newPlaylistBtn">+ New Playlist</button>
+          </div>
+
+          <div class="create-tab-playlist-form hide">
+            <div class="form-group">
+              <label for="playlistName">Playlist Name:</label>
+              <input
+                type="text"
+                id="playlistName"
+                placeholder="My Awesome Playlist"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="playlistDescription">Description:</label>
+              <textarea
+                id="playlistDescription"
+                placeholder="Description of your playlist"
+              ></textarea>
+            </div>
+
+            <div class="playlist-actions">
+              <button id="savePlaylistBtn">Save Playlist</button>
+              <button id="cancelEditBtn">Cancel</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -362,15 +458,42 @@
       // DOM Elements
       const trackList = document.getElementById("trackList");
       const playlistTracks = document.getElementById("playlistTracks");
-      const savedPlaylistsList = document.getElementById("savedPlaylists");
+      const playlistsList = document.getElementById("playlistsList");
       const searchInput = document.getElementById("searchInput");
       const audioPreview = document.getElementById("audioPreview");
+      const audioPreviewNowPlaying = document.querySelector(
+        ".audio-preview-nowplaying"
+      );
+      const playlistEditForm = document.querySelector(
+        ".create-tab-playlist-form"
+      );
+      const createPlaylistButtonContainer = document.querySelector(
+        ".create-tab-playlist-create"
+      );
       const playlistName = document.getElementById("playlistName");
-      const playlistDescription = document.getElementById("playlistDescription");
+      const playlistDescription = document.getElementById(
+        "playlistDescription"
+      );
       const savePlaylistBtn = document.getElementById("savePlaylistBtn");
       const clearPlaylistBtn = document.getElementById("clearPlaylistBtn");
-      const downloadPlaylistBtn = document.getElementById("downloadPlaylistBtn");
-      const messageArea = document.getElementById("messageArea");
+      const downloadPlaylistBtn = document.getElementById(
+        "downloadPlaylistBtn"
+      );
+      const downloadAllPlaylistsBtn = document.getElementById(
+        "downloadAllPlaylistsBtn"
+      );
+      const importPlaylistsBtn = document.getElementById("importPlaylistsBtn");
+      const playlistImportInput = document.getElementById(
+        "playlistImportInput"
+      );
+      const newPlaylistBtn = document.getElementById("newPlaylistBtn");
+      const editPlaylistBtn = document.getElementById("editPlaylistBtn");
+      const cancelEditBtn = document.getElementById("cancelEditBtn");
+      const activePlaylistSection = document.getElementById(
+        "activePlaylistSection"
+      );
+      const activePlaylistName = document.getElementById("activePlaylistName");
+      const toastContainer = document.getElementById("toastContainer");
       const tabs = document.querySelectorAll(".tab");
       const tabContents = document.querySelectorAll(".tab-content");
 
@@ -384,6 +507,7 @@
       };
       let savedPlaylists = [];
       let editMode = false;
+      let activePlaylistId = null;
 
       // Initialize
       init();
@@ -414,9 +538,11 @@
             const tabId = tab.dataset.tab;
             document.getElementById(`${tabId}Tab`).classList.add("active");
 
-            // If switching to saved playlists tab, render the saved playlists
-            if (tabId === "saved") {
-              renderSavedPlaylists();
+            // If switching to playlists tab, render the playlists list
+            if (tabId === "playlists") {
+              renderPlaylistsList();
+              createPlaylistButtonContainer.classList.remove("hide");
+              playlistEditForm.classList.add("hide");
             }
           });
         });
@@ -427,44 +553,6 @@
         // In a real implementation, you would make an AJAX request to the server
         // to get a list of audio files in the audio directory
 
-        // For demo purposes, we'll define some sample tracks
-        availableTracks = [
-          {
-            id: 1,
-            title: "Summer Vibes",
-            artist: "DJ Sunshine",
-            filename: "summer_vibes.mp3",
-          },
-          {
-            id: 2,
-            title: "Midnight Drive",
-            artist: "Night Cruiser",
-            filename: "midnight_drive.mp3",
-          },
-          {
-            id: 3,
-            title: "Mountain High",
-            artist: "Peak Climbers",
-            filename: "mountain_high.mp3",
-          },
-          {
-            id: 4,
-            title: "Ocean Waves",
-            artist: "Coastal Dreams",
-            filename: "ocean_waves.mp3",
-          },
-          {
-            id: 5,
-            title: "City Lights",
-            artist: "Urban Explorers",
-            filename: "city_lights.mp3",
-          },
-        ];
-        renderTrackList();
-
-        // In a real implementation, you would fetch the tracks from a server
-        // For example:
-        /*
         fetch("available_tracks.json")
           .then((response) => response.json())
           .then((data) => {
@@ -472,7 +560,8 @@
             renderTrackList();
           })
           .catch((error) => console.error("Error loading tracks:", error));
-        */
+
+        renderTrackList();
       }
 
       function renderTrackList(filter = "") {
@@ -531,15 +620,17 @@
       }
 
       function previewTrack(filename) {
-        // In a real implementation, the audio file would be loaded from a server
-        // For demo purposes, we'll just show a message
-        showMessage(`Playing ${filename} (demo)`, "success");
-        
-        // This would be the actual implementation:
-        // audioPreview.src = `audio/${filename}`;
-        // audioPreview.play().catch((error) => {
-        //   showMessage(`Error playing track: ${error.message}`, "error");
-        // });
+        // Set the source of the audio element to the track file
+        audioPreview.src = `audio/${filename}`;
+
+        // Play the audio and handle any errors
+        audioPreview.play().catch((error) => {
+          console.error("Error playing track:", error);
+          showMessage(`Error playing track: ${error.message}`, "error");
+        });
+
+        audioPreviewNowPlaying.innerText = filename;
+        showMessage(`Playing ${filename}`, "success");
       }
 
       function addTrackToPlaylist(trackId) {
@@ -550,25 +641,356 @@
           return;
         }
 
+        // Check if we have an active playlist
+        if (!activePlaylistId) {
+          showMessage("Please select or create a playlist first", "error");
+          return;
+        }
+
+        // Get the active playlist
+        const playlistIndex = savedPlaylists.findIndex(
+          (p) => p.id === activePlaylistId
+        );
+        if (playlistIndex === -1) {
+          showMessage("Selected playlist not found", "error");
+          return;
+        }
+
         // Check if track is already in the playlist
-        if (currentPlaylist.tracks.some((t) => t.id === trackId)) {
+        const trackExists = savedPlaylists[playlistIndex].tracks.some(
+          (t) =>
+            t.file === track.filename ||
+            (t.title === track.title && t.artist === track.artist)
+        );
+
+        if (trackExists) {
           showMessage("Track is already in the playlist", "error");
           return;
         }
 
-        // Add track to the playlist
-        currentPlaylist.tracks.push({
-          id: track.id,
+        // Add track to the active playlist
+        savedPlaylists[playlistIndex].tracks.push({
           title: track.title,
           artist: track.artist,
-          filename: track.filename,
+          file: track.filename,
         });
 
-        renderPlaylist();
-        showMessage(`Added "${track.title}" to the playlist`, "success");
+        // Save changes to localStorage
+        localStorage.setItem("savedPlaylists", JSON.stringify(savedPlaylists));
+
+        // Update the current playlist if it's the active one
+        if (currentPlaylist.id === activePlaylistId) {
+          currentPlaylist.tracks.push({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            filename: track.filename,
+          });
+        }
+
+        // Refresh the display
+        renderActivePlaylist();
+        renderPlaylistsList();
+        showMessage(
+          `Added "${track.title}" to "${savedPlaylists[playlistIndex].name}"`,
+          "success"
+        );
       }
 
-      function renderPlaylist() {
+      // function renderPlaylist() {
+      //   // Clear the list
+      //   playlistTracks.innerHTML = "";
+
+      //   if (currentPlaylist.tracks.length === 0) {
+      //     playlistTracks.innerHTML = `
+      //       <li class="playlist-item empty-message">
+      //           <div class="track-info">
+      //               <div class="track-title">No tracks added yet</div>
+      //           </div>
+      //       </li>
+      //     `;
+      //     return;
+      //   }
+
+      //   // Add each track to the list
+      //   currentPlaylist.tracks.forEach((track, index) => {
+      //     const li = document.createElement("li");
+      //     li.className = "playlist-item";
+      //     li.draggable = true;
+      //     li.dataset.index = index;
+      //     li.innerHTML = `
+      //       <span class="drag-handle">☰</span>
+      //       <div class="track-info">
+      //           <div class="track-title">${track.title}</div>
+      //           <div class="track-artist">${track.artist}</div>
+      //       </div>
+      //       <div class="track-actions">
+      //           <button class="preview" data-filename="${track.filename}">Preview</button>
+      //           <button class="remove" data-index="${index}">Remove</button>
+      //       </div>
+      //     `;
+      //     playlistTracks.appendChild(li);
+      //   });
+
+      //   // Add event listeners to buttons
+      //   playlistTracks.querySelectorAll(".preview").forEach((button) => {
+      //     button.addEventListener("click", () => {
+      //       const filename = button.dataset.filename;
+      //       previewTrack(filename);
+      //     });
+      //   });
+
+      //   playlistTracks.querySelectorAll(".remove").forEach((button) => {
+      //     button.addEventListener("click", () => {
+      //       const index = parseInt(button.dataset.index);
+      //       removeTrackFromPlaylist(index);
+      //     });
+      //   });
+
+      //   // Setup drag and drop functionality
+      //   setupDragAndDrop();
+      // }
+
+      function removeTrackFromPlaylist(index) {
+        if (index < 0 || index >= currentPlaylist.tracks.length) {
+          return;
+        }
+
+        if (!activePlaylistId) {
+          showMessage("No active playlist selected", "error");
+          return;
+        }
+
+        const removedTrack = currentPlaylist.tracks[index];
+        currentPlaylist.tracks.splice(index, 1);
+
+        // Find and update the saved playlist
+        const playlistIndex = savedPlaylists.findIndex(
+          (p) => p.id === activePlaylistId
+        );
+        if (playlistIndex !== -1) {
+          // Remove the corresponding track from the saved playlist
+          savedPlaylists[playlistIndex].tracks.splice(index, 1);
+
+          // Save changes to localStorage
+          localStorage.setItem(
+            "savedPlaylists",
+            JSON.stringify(savedPlaylists)
+          );
+        }
+
+        renderActivePlaylist();
+        renderPlaylistsList();
+
+        showMessage(
+          `Removed "${removedTrack.title}" from the playlist`,
+          "success"
+        );
+      }
+
+      function setupDragAndDrop() {
+        const items = playlistTracks.querySelectorAll(".playlist-item");
+
+        items.forEach((item) => {
+          item.addEventListener("dragstart", () => {
+            item.classList.add("dragging");
+            // Store the index of the dragged item
+            item.setAttribute("data-dragging-index", item.dataset.index);
+          });
+
+          item.addEventListener("dragend", () => {
+            item.classList.remove("dragging");
+          });
+
+          item.addEventListener("dragover", (e) => {
+            e.preventDefault();
+          });
+
+          item.addEventListener("drop", (e) => {
+            e.preventDefault();
+
+            // Get the indices of the dragged and target items
+            const draggedIndex = parseInt(
+              document.querySelector(".dragging").dataset.draggingIndex
+            );
+            const targetIndex = parseInt(item.dataset.index);
+
+            if (draggedIndex !== targetIndex) {
+              // Reorder the tracks in the playlist
+              const draggedTrack = currentPlaylist.tracks[draggedIndex];
+              currentPlaylist.tracks.splice(draggedIndex, 1);
+              currentPlaylist.tracks.splice(targetIndex, 0, draggedTrack);
+
+              // Also update the saved playlist to maintain sync
+              if (activePlaylistId) {
+                const playlistIndex = savedPlaylists.findIndex(
+                  (p) => p.id === activePlaylistId
+                );
+                if (playlistIndex !== -1) {
+                  const savedTrack =
+                    savedPlaylists[playlistIndex].tracks[draggedIndex];
+                  savedPlaylists[playlistIndex].tracks.splice(draggedIndex, 1);
+                  savedPlaylists[playlistIndex].tracks.splice(
+                    targetIndex,
+                    0,
+                    savedTrack
+                  );
+
+                  // Save to localStorage
+                  localStorage.setItem(
+                    "savedPlaylists",
+                    JSON.stringify(savedPlaylists)
+                  );
+                }
+              }
+
+              renderActivePlaylist();
+            }
+          });
+        });
+      }
+
+      function loadSavedPlaylists() {
+        // Load playlists from localStorage
+        const savedPlaylistsJson = localStorage.getItem("savedPlaylists");
+        if (savedPlaylistsJson) {
+          try {
+            savedPlaylists = JSON.parse(savedPlaylistsJson);
+            showMessage("Loaded saved playlists", "success");
+
+            // If there's at least one playlist, select the first one by default
+            if (savedPlaylists.length > 0) {
+              setTimeout(() => {
+                selectPlaylist(savedPlaylists[0].id);
+              }, 100);
+            }
+          } catch (error) {
+            console.error("Error parsing saved playlists:", error);
+            savedPlaylists = [];
+            showMessage("Error loading saved playlists", "error");
+          }
+        }
+      }
+
+      function renderPlaylistsList() {
+        // Clear the list
+        playlistsList.innerHTML = "";
+
+        if (savedPlaylists.length === 0) {
+          playlistsList.innerHTML = `
+            <li class="saved-playlist-item empty-message">
+                <div class="saved-playlist-info">
+                    <div class="saved-playlist-name">No playlists</div>
+                </div>
+            </li>
+          `;
+          // Hide active playlist section when no playlists exist
+          activePlaylistSection.style.display = "none";
+          return;
+        }
+
+        // Add each playlist to the list
+        savedPlaylists.forEach((playlist) => {
+          const li = document.createElement("li");
+          li.className = "saved-playlist-item";
+          if (playlist.id === activePlaylistId) {
+            li.classList.add("active");
+          }
+
+          li.innerHTML = `
+            <div class="saved-playlist-info">
+                <div class="saved-playlist-name">${playlist.name}</div>
+                <div class="saved-playlist-description">${
+                  playlist.description || "No description"
+                }</div>
+                <div class="saved-playlist-tracks">${
+                  playlist.tracks.length
+                } tracks</div>
+            </div>
+            <div class="saved-playlist-actions">
+                <button class="select" data-playlist-id="${
+                  playlist.id
+                }">Select</button>
+                <button class="edit" data-playlist-id="${
+                  playlist.id
+                }">Edit</button>
+                <button class="remove" data-playlist-id="${
+                  playlist.id
+                }">Delete</button>
+            </div>
+          `;
+          playlistsList.appendChild(li);
+        });
+
+        // Add event listeners to buttons
+        playlistsList.querySelectorAll(".select").forEach((button) => {
+          button.addEventListener("click", () => {
+            const playlistId = button.dataset.playlistId;
+            selectPlaylist(playlistId);
+          });
+        });
+
+        playlistsList.querySelectorAll(".edit").forEach((button) => {
+          button.addEventListener("click", () => {
+            const playlistId = button.dataset.playlistId;
+            editPlaylist(playlistId);
+          });
+        });
+
+        playlistsList.querySelectorAll(".remove").forEach((button) => {
+          button.addEventListener("click", () => {
+            const playlistId = button.dataset.playlistId;
+            deletePlaylist(playlistId);
+          });
+        });
+      }
+
+      function selectPlaylist(playlistId) {
+        const playlist = savedPlaylists.find((p) => p.id === playlistId);
+        if (!playlist) {
+          showMessage("Playlist not found", "error");
+          return;
+        }
+
+        // Set as active playlist
+        activePlaylistId = playlistId;
+
+        // Update UI to show this is the active playlist
+        renderPlaylistsList();
+
+        // Set current playlist to match the active one (for track management)
+        currentPlaylist = {
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description || "",
+          tracks: playlist.tracks.map((track) => {
+            // Convert saved track format to current playlist format
+            const availableTrack = availableTracks.find(
+              (t) =>
+                t.filename === track.file ||
+                (t.title === track.title && t.artist === track.artist)
+            );
+
+            return {
+              id: availableTrack ? availableTrack.id : generateId(),
+              title: track.title,
+              artist: track.artist,
+              filename: track.file,
+            };
+          }),
+        };
+
+        // Show the active playlist section and update name
+        activePlaylistSection.style.display = "block";
+        activePlaylistName.textContent = playlist.name;
+
+        // Render the tracks of the active playlist
+        renderActivePlaylist();
+
+        showMessage(`Selected playlist "${playlist.name}"`, "success");
+      }
+
+      function renderActivePlaylist() {
         // Clear the list
         playlistTracks.innerHTML = "";
 
@@ -622,124 +1044,6 @@
         setupDragAndDrop();
       }
 
-      function removeTrackFromPlaylist(index) {
-        if (index < 0 || index >= currentPlaylist.tracks.length) {
-          return;
-        }
-
-        const removedTrack = currentPlaylist.tracks[index];
-        currentPlaylist.tracks.splice(index, 1);
-
-        renderPlaylist();
-        showMessage(
-          `Removed "${removedTrack.title}" from the playlist`,
-          "success"
-        );
-      }
-
-      function setupDragAndDrop() {
-        const items = playlistTracks.querySelectorAll(".playlist-item");
-
-        items.forEach((item) => {
-          item.addEventListener("dragstart", () => {
-            item.classList.add("dragging");
-            // Store the index of the dragged item
-            item.setAttribute("data-dragging-index", item.dataset.index);
-          });
-
-          item.addEventListener("dragend", () => {
-            item.classList.remove("dragging");
-          });
-
-          item.addEventListener("dragover", (e) => {
-            e.preventDefault();
-          });
-
-          item.addEventListener("drop", (e) => {
-            e.preventDefault();
-
-            // Get the indices of the dragged and target items
-            const draggedIndex = parseInt(
-              document.querySelector(".dragging").dataset.draggingIndex
-            );
-            const targetIndex = parseInt(item.dataset.index);
-
-            if (draggedIndex !== targetIndex) {
-              // Reorder the tracks in the playlist
-              const draggedTrack = currentPlaylist.tracks[draggedIndex];
-              currentPlaylist.tracks.splice(draggedIndex, 1);
-              currentPlaylist.tracks.splice(targetIndex, 0, draggedTrack);
-
-              renderPlaylist();
-            }
-          });
-        });
-      }
-
-      function loadSavedPlaylists() {
-        // Load playlists from localStorage
-        const savedPlaylistsJson = localStorage.getItem("savedPlaylists");
-        if (savedPlaylistsJson) {
-          try {
-            savedPlaylists = JSON.parse(savedPlaylistsJson);
-            showMessage("Loaded saved playlists", "success");
-          } catch (error) {
-            console.error("Error parsing saved playlists:", error);
-            savedPlaylists = [];
-            showMessage("Error loading saved playlists", "error");
-          }
-        }
-      }
-
-      function renderSavedPlaylists() {
-        // Clear the list
-        savedPlaylistsList.innerHTML = "";
-
-        if (savedPlaylists.length === 0) {
-          savedPlaylistsList.innerHTML = `
-            <li class="saved-playlist-item empty-message">
-                <div class="saved-playlist-info">
-                    <div class="saved-playlist-name">No saved playlists</div>
-                </div>
-            </li>
-          `;
-          return;
-        }
-
-        // Add each playlist to the list
-        savedPlaylists.forEach((playlist, index) => {
-          const li = document.createElement("li");
-          li.className = "saved-playlist-item";
-          li.innerHTML = `
-            <div class="saved-playlist-info">
-                <div class="saved-playlist-name">${playlist.name}</div>
-                <div class="saved-playlist-description">${playlist.description || "No description"}</div>
-                <div class="saved-playlist-tracks">${playlist.tracks.length} tracks</div>
-            </div>
-            <div class="saved-playlist-actions">
-                <button class="edit" data-playlist-id="${playlist.id}">Edit</button>
-                <button class="remove" data-index="${index}">Delete</button>
-            </div>
-          `;
-          savedPlaylistsList.appendChild(li);
-        });
-
-        // Add event listeners to buttons
-        savedPlaylistsList.querySelectorAll(".edit").forEach((button) => {
-          button.addEventListener("click", () => {
-            const playlistId = button.dataset.playlistId;
-            editPlaylist(playlistId);
-          });
-        });
-
-        savedPlaylistsList.querySelectorAll(".remove").forEach((button) => {
-          button.addEventListener("click", () => {
-            const index = parseInt(button.dataset.index);
-            deletePlaylist(index);
-          });
-        });
-      }
-
       function editPlaylist(playlistId) {
         const playlist = savedPlaylists.find((p) => p.id === playlistId);
         if (!playlist) {
@@ -752,51 +1056,70 @@
           id: playlist.id,
           name: playlist.name,
           description: playlist.description || "",
-          tracks: playlist.tracks.map(track => {
+          tracks: playlist.tracks.map((track) => {
             // Convert saved track format to current playlist format
-            const availableTrack = availableTracks.find(t => 
-              t.filename === track.file || 
-              (t.title === track.title && t.artist === track.artist)
+            const availableTrack = availableTracks.find(
+              (t) =>
+                t.filename === track.file ||
+                (t.title === track.title && t.artist === track.artist)
             );
-            
+
             return {
               id: availableTrack ? availableTrack.id : generateId(),
               title: track.title,
               artist: track.artist,
-              filename: track.file
+              filename: track.file,
             };
-          })
+          }),
         };
 
         // Update form fields
         playlistName.value = currentPlaylist.name;
         playlistDescription.value = currentPlaylist.description;
+        playlistEditForm.classList.remove("hide");
+        createPlaylistButtonContainer.classList.add("hide");
 
-        // Render tracks
-        renderPlaylist();
-
-        // Switch to create tab
+        // Switch to create/edit tab
         document.querySelector('.tab[data-tab="create"]').click();
-        
+
         // Set edit mode
         editMode = true;
         savePlaylistBtn.textContent = "Update Playlist";
-        
+
         showMessage(`Editing playlist "${playlist.name}"`, "success");
       }
 
-      function deletePlaylist(index) {
-        if (index < 0 || index >= savedPlaylists.length) {
+      function deletePlaylist(playlistId) {
+        const playlistIndex = savedPlaylists.findIndex(
+          (p) => p.id === playlistId
+        );
+        if (playlistIndex === -1) {
+          showMessage("Playlist not found", "error");
           return;
         }
 
-        const deletedPlaylist = savedPlaylists[index];
-        savedPlaylists.splice(index, 1);
+        // Ask for confirmation
+        if (
+          !confirm(
+            `Are you sure you want to delete "${savedPlaylists[playlistIndex].name}"?`
+          )
+        ) {
+          return;
+        }
+
+        const deletedPlaylist = savedPlaylists[playlistIndex];
+        savedPlaylists.splice(playlistIndex, 1);
 
         // Save to localStorage
         localStorage.setItem("savedPlaylists", JSON.stringify(savedPlaylists));
 
-        renderSavedPlaylists();
+        // If we deleted the active playlist, clear it
+        if (activePlaylistId === deletedPlaylist.id) {
+          activePlaylistId = null;
+          activePlaylistSection.style.display = "none";
+        }
+
+        renderPlaylistsList();
         showMessage(`Deleted playlist "${deletedPlaylist.name}"`, "success");
       }
 
@@ -809,9 +1132,9 @@
           return;
         }
 
-        if (currentPlaylist.tracks.length === 0) {
-          showMessage("Please add at least one track to the playlist", "error");
-          return;
+        // For new playlists, we don't require tracks at creation time
+        if (!editMode && currentPlaylist.tracks.length === 0) {
+          // This is fine - we're creating an empty playlist
         }
 
         // Create new playlist object
@@ -828,7 +1151,9 @@
 
         if (editMode) {
           // Update existing playlist
-          const existingIndex = savedPlaylists.findIndex((p) => p.id === playlist.id);
+          const existingIndex = savedPlaylists.findIndex(
+            (p) => p.id === playlist.id
+          );
           if (existingIndex !== -1) {
             savedPlaylists[existingIndex] = playlist;
             showMessage(`Updated playlist "${name}"`, "success");
@@ -837,15 +1162,22 @@
             savedPlaylists.push(playlist);
             showMessage(`Saved playlist "${name}"`, "success");
           }
-          
+
           // Reset edit mode
           editMode = false;
           savePlaylistBtn.textContent = "Save Playlist";
+          ("Save Playlist");
         } else {
           // Check if a playlist with the same name already exists
-          const existingIndex = savedPlaylists.findIndex((p) => p.name === name);
+          const existingIndex = savedPlaylists.findIndex(
+            (p) => p.name === name
+          );
           if (existingIndex !== -1) {
-            if (confirm(`A playlist named "${name}" already exists. Do you want to replace it?`)) {
+            if (
+              confirm(
+                `A playlist named "${name}" already exists. Do you want to replace it?`
+              )
+            ) {
               savedPlaylists[existingIndex] = playlist;
               showMessage(`Updated playlist "${name}"`, "success");
             } else {
@@ -854,15 +1186,23 @@
           } else {
             // Add new playlist
             savedPlaylists.push(playlist);
-            showMessage(`Saved playlist "${name}"`, "success");
+            showMessage(`Created playlist "${name}"`, "success");
           }
         }
 
         // Save to localStorage
         localStorage.setItem("savedPlaylists", JSON.stringify(savedPlaylists));
-        
-        // Reset current playlist
+
+        // Set this as the active playlist
+        activePlaylistId = playlist.id;
+
+        // Refresh the UI
         resetCurrentPlaylist();
+        document.querySelector('.tab[data-tab="playlists"]').click();
+        renderPlaylistsList();
+        createPlaylistButtonContainer.classList.remove("hide");
+        playlistEditForm.classList.add("hide");
+        selectPlaylist(playlist.id);
       }
 
       function resetCurrentPlaylist() {
@@ -872,58 +1212,93 @@
           description: "",
           tracks: [],
         };
-        
+
         // Clear form fields
         playlistName.value = "";
         playlistDescription.value = "";
-        
+
         // Reset edit mode if active
         if (editMode) {
           editMode = false;
           savePlaylistBtn.textContent = "Save Playlist";
         }
-        
-        // Render empty playlist
-        renderPlaylist();
+      }
+
+      function createNewPlaylist() {
+        // Clear the current playlist
+        resetCurrentPlaylist();
+
+        createPlaylistButtonContainer.classList.add("hide");
+        playlistEditForm.classList.remove("hide");
+
+        // Switch to the create tab
+        document.querySelector('.tab[data-tab="create"]').click();
+
+        // Focus on the playlist name field
+        playlistName.focus();
       }
 
       function clearPlaylist() {
+        if (!activePlaylistId) {
+          showMessage("No active playlist selected", "error");
+          return;
+        }
+
         // Ask for confirmation
         if (currentPlaylist.tracks.length > 0) {
-          if (!confirm("Are you sure you want to clear the current playlist?")) {
+          if (
+            !confirm(
+              "Are you sure you want to remove all tracks from this playlist?"
+            )
+          ) {
             return;
           }
         }
-        
-        resetCurrentPlaylist();
-        showMessage("Playlist cleared", "success");
+
+        // Clear tracks from the active playlist
+        const playlistIndex = savedPlaylists.findIndex(
+          (p) => p.id === activePlaylistId
+        );
+        if (playlistIndex !== -1) {
+          // Keep the playlist but remove all tracks
+          savedPlaylists[playlistIndex].tracks = [];
+
+          // Update current playlist to match
+          currentPlaylist.tracks = [];
+
+          // Save to localStorage
+          localStorage.setItem(
+            "savedPlaylists",
+            JSON.stringify(savedPlaylists)
+          );
+
+          // Update the UI
+          renderActivePlaylist();
+
+          showMessage("All tracks removed from playlist", "success");
+        }
       }
 
       function downloadPlaylistJson() {
-        const name = playlistName.value.trim();
-        const description = playlistDescription.value.trim();
-
-        if (!name) {
-          showMessage("Please enter a playlist name", "error");
+        if (!activePlaylistId) {
+          showMessage("No active playlist selected", "error");
           return;
         }
 
-        if (currentPlaylist.tracks.length === 0) {
-          showMessage("Please add at least one track to the playlist", "error");
+        const playlistIndex = savedPlaylists.findIndex(
+          (p) => p.id === activePlaylistId
+        );
+        if (playlistIndex === -1) {
+          showMessage("Selected playlist not found", "error");
           return;
         }
 
-        // Create playlist object for download
-        const playlist = {
-          id: currentPlaylist.id || generateId(),
-          name: name,
-          description: description,
-          tracks: currentPlaylist.tracks.map((track) => ({
-            title: track.title,
-            artist: track.artist,
-            file: track.filename,
-          })),
-        };
+        const playlist = savedPlaylists[playlistIndex];
+
+        if (playlist.tracks.length === 0) {
+          showMessage("Playlist has no tracks to download", "error");
+          return;
+        }
 
         // Create a JSON blob and download it
         const playlistJson = JSON.stringify([playlist], null, 2);
@@ -932,33 +1307,162 @@
 
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${name.replace(/\s+/g, "_").toLowerCase()}.json`;
+        a.download = `${playlist.name.replace(/\s+/g, "_").toLowerCase()}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showMessage(`Downloaded playlist "${name}"`, "success");
+        showMessage(`Downloaded playlist "${playlist.name}"`, "success");
+      }
+
+      function importPlaylists() {
+        playlistImportInput.click();
+      }
+
+      function handlePlaylistImport(event) {
+        const file = event.target.files[0];
+        if (!file) {
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const importedData = JSON.parse(e.target.result);
+
+            if (!Array.isArray(importedData)) {
+              showMessage(
+                "Invalid playlist file format. Expected an array of playlists.",
+                "error"
+              );
+              return;
+            }
+
+            // Validate the imported data
+            let validPlaylists = 0;
+            let invalidPlaylists = 0;
+
+            savedPlaylists = [];
+
+            importedData.forEach((playlist) => {
+              // Check if it has the required properties
+              if (playlist && playlist.name && Array.isArray(playlist.tracks)) {
+                // Ensure it has a unique ID
+                if (!playlist.id) {
+                  playlist.id = generateId();
+                } else {
+                  // Check if ID already exists, if so, generate a new one
+                  if (savedPlaylists.some((p) => p.id === playlist.id)) {
+                    playlist.id = generateId();
+                  }
+                }
+
+                // Check for duplicate names
+                const existingIndex = savedPlaylists.findIndex(
+                  (p) => p.name === playlist.name
+                );
+                if (existingIndex !== -1) {
+                  // Generate a unique name
+                  playlist.name = `${
+                    playlist.name
+                  } (Imported ${new Date().toLocaleTimeString()})`;
+                }
+
+                // Add to saved playlists
+                savedPlaylists.push(playlist);
+                validPlaylists++;
+              } else {
+                invalidPlaylists++;
+              }
+            });
+
+            // Save to localStorage
+            localStorage.setItem(
+              "savedPlaylists",
+              JSON.stringify(savedPlaylists)
+            );
+
+            // Update UI
+            renderPlaylistsList();
+
+            // Show success message
+            if (validPlaylists > 0) {
+              showMessage(
+                `Imported ${validPlaylists} playlists successfully${
+                  invalidPlaylists > 0
+                    ? ` (${invalidPlaylists} invalid items ignored)`
+                    : ""
+                }`,
+                "success"
+              );
+
+              // Select the first imported playlist
+              if (validPlaylists > 0 && importedData[0] && importedData[0].id) {
+                selectPlaylist(importedData[0].id);
+              }
+            } else {
+              showMessage(
+                "No valid playlists found in the imported file",
+                "error"
+              );
+            }
+          } catch (error) {
+            console.error("Error importing playlists:", error);
+            showMessage(
+              "Failed to import playlists. Invalid file format.",
+              "error"
+            );
+          }
+
+          // Reset the file input
+          playlistImportInput.value = "";
+        };
+
+        reader.readAsText(file);
+      }
+
+      function downloadAllPlaylistsJson() {
+        const allPlaylistsJson = JSON.stringify(savedPlaylists, null, 2);
+        const blob = new Blob([allPlaylistsJson], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        // Generate a timestamp for the filename
+        const timestamp = new Date()
+          .toISOString()
+          .replace(/[:\-T]/g, "")
+          .split(".")[0]; // Format: YYYYMMDDHHmmss
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `all_playlists_${timestamp}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showMessage(`Downloaded ${savedPlaylists.length} playlists`, "success");
       }
 
       function showMessage(message, type) {
-        const div = document.createElement("div");
-        div.className = `message ${type}`;
-        div.textContent = message;
+        const toast = document.createElement("div");
+        toast.className = `message ${type}`;
+        toast.textContent = message;
 
-        messageArea.innerHTML = "";
-        messageArea.appendChild(div);
+        // Add to toast container
+        toastContainer.appendChild(toast);
 
-        // Clear message after 3 seconds
+        // Remove toast after animation completes (3 seconds)
         setTimeout(() => {
-          div.remove();
+          toast.remove();
         }, 3000);
       }
 
       function generateId() {
-        return (
-          Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
-        );
+        // More robust ID generation that includes a random component
+        const timestamp = Date.now().toString(36);
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        return `${timestamp}-${randomStr}`;
       }
 
       function setupEventListeners() {
@@ -970,11 +1474,38 @@
         // Save playlist button
         savePlaylistBtn.addEventListener("click", saveCurrentPlaylist);
 
+        // New playlist button
+        newPlaylistBtn.addEventListener("click", createNewPlaylist);
+
+        // Edit playlist details button
+        editPlaylistBtn.addEventListener("click", () => {
+          if (activePlaylistId) {
+            editPlaylist(activePlaylistId);
+          }
+        });
+
+        // Cancel edit button
+        cancelEditBtn.addEventListener("click", () => {
+          document.querySelector('.tab[data-tab="playlists"]').click();
+        });
+
         // Clear playlist button
         clearPlaylistBtn.addEventListener("click", clearPlaylist);
 
         // Download playlist button
         downloadPlaylistBtn.addEventListener("click", downloadPlaylistJson);
+
+        // Download all playlists button
+        downloadAllPlaylistsBtn.addEventListener(
+          "click",
+          downloadAllPlaylistsJson
+        );
+
+        // Import playlists button
+        importPlaylistsBtn.addEventListener("click", importPlaylists);
+
+        // File import handler
+        playlistImportInput.addEventListener("change", handlePlaylistImport);
       }
     </script>
   </body>
