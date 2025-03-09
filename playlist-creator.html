@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playlist Creator</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+        color: #333;
+      }
+
+      h1,
+      h2 {
+        color: #2c3e50;
+      }
+
+      .container {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .panel {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        flex: 1;
+      }
+
+      .tracks-panel {
+        flex: 1;
+      }
+
+      .playlist-panel {
+        flex: 1;
+      }
+
+      .track-list,
+      .playlist-tracks,
+      .saved-playlists {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #e1e1e1;
+        border-radius: 4px;
+      }
+
+      .track-item,
+      .playlist-item,
+      .saved-playlist-item {
+        padding: 10px 15px;
+        border-bottom: 1px solid #e1e1e1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .track-item:hover,
+      .playlist-item:hover,
+      .saved-playlist-item:hover {
+        background-color: #f8f9fa;
+      }
+
+      .track-info {
+        flex: 1;
+      }
+
+      .track-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .track-artist {
+        font-size: 0.9em;
+        color: #7f8c8d;
+      }
+
+      .track-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      button:hover {
+        background-color: #2980b9;
+      }
+
+      button.remove {
+        background-color: #e74c3c;
+      }
+
+      button.remove:hover {
+        background-color: #c0392b;
+      }
+
+      button.preview {
+        background-color: #2ecc71;
+      }
+
+      button.preview:hover {
+        background-color: #27ae60;
+      }
+
+      button.edit {
+        background-color: #f39c12;
+      }
+
+      button.edit:hover {
+        background-color: #d35400;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 60px;
+      }
+
+      .playlist-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .audio-preview {
+        margin-top: 20px;
+      }
+
+      .drag-handle {
+        cursor: move;
+        color: #95a5a6;
+        margin-right: 10px;
+      }
+
+      /* Search and filter */
+      .search-container {
+        margin-bottom: 15px;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      .message {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      /* Drag and drop styling */
+      .dragging {
+        opacity: 0.5;
+        background-color: #e1f0fa;
+      }
+
+      /* Audio player */
+      audio {
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .tab {
+        padding: 10px 20px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-bottom: none;
+      }
+
+      .tab.active {
+        background-color: #fff;
+        border-color: #ddd;
+        border-bottom-color: #fff;
+        border-radius: 4px 4px 0 0;
+        margin-bottom: -1px;
+        font-weight: bold;
+      }
+
+      .tab-content {
+        display: none;
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Saved Playlists */
+      .saved-playlists-container {
+        margin-top: 20px;
+      }
+
+      .saved-playlist-info {
+        flex: 1;
+      }
+
+      .saved-playlist-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .saved-playlist-description {
+        font-size: 0.9em;
+        color: #7f8c8d;
+      }
+
+      .saved-playlist-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .container {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Playlist Creator</h1>
+
+    <div class="container">
+      <div class="panel tracks-panel">
+        <h2>Available Tracks</h2>
+
+        <div class="search-container">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Search tracks..."
+          />
+        </div>
+
+        <div id="messageArea"></div>
+
+        <ul id="trackList" class="track-list">
+          <li class="track-item">
+            <div class="track-info">
+              <div class="track-title">Loading tracks...</div>
+            </div>
+          </li>
+        </ul>
+
+        <div class="audio-preview">
+          <h3>Preview</h3>
+          <audio id="audioPreview" controls></audio>
+        </div>
+      </div>
+
+      <div class="panel playlist-panel">
+        <div class="tabs">
+          <div class="tab active" data-tab="create">Create Playlist</div>
+          <div class="tab" data-tab="saved">Saved Playlists</div>
+        </div>
+
+        <div id="createTab" class="tab-content active">
+          <div class="form-group">
+            <label for="playlistName">Playlist Name:</label>
+            <input
+              type="text"
+              id="playlistName"
+              placeholder="My Awesome Playlist"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="playlistDescription">Description:</label>
+            <textarea
+              id="playlistDescription"
+              placeholder="Description of your playlist"
+            ></textarea>
+          </div>
+
+          <h3>Playlist Tracks</h3>
+          <ul id="playlistTracks" class="playlist-tracks">
+            <li class="playlist-item empty-message">
+              <div class="track-info">
+                <div class="track-title">No tracks added yet</div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="playlist-actions">
+            <button id="savePlaylistBtn">Save Playlist</button>
+            <button id="clearPlaylistBtn">Clear Playlist</button>
+            <button id="downloadPlaylistBtn">Download JSON</button>
+          </div>
+        </div>
+
+        <div id="savedTab" class="tab-content">
+          <h3>Your Saved Playlists</h3>
+          <ul id="savedPlaylists" class="saved-playlists">
+            <li class="saved-playlist-item empty-message">
+              <div class="saved-playlist-info">
+                <div class="saved-playlist-name">No saved playlists</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // DOM Elements
+      const trackList = document.getElementById("trackList");
+      const playlistTracks = document.getElementById("playlistTracks");
+      const savedPlaylistsList = document.getElementById("savedPlaylists");
+      const searchInput = document.getElementById("searchInput");
+      const audioPreview = document.getElementById("audioPreview");
+      const playlistName = document.getElementById("playlistName");
+      const playlistDescription = document.getElementById("playlistDescription");
+      const savePlaylistBtn = document.getElementById("savePlaylistBtn");
+      const clearPlaylistBtn = document.getElementById("clearPlaylistBtn");
+      const downloadPlaylistBtn = document.getElementById("downloadPlaylistBtn");
+      const messageArea = document.getElementById("messageArea");
+      const tabs = document.querySelectorAll(".tab");
+      const tabContents = document.querySelectorAll(".tab-content");
+
+      // State
+      let availableTracks = [];
+      let currentPlaylist = {
+        id: null,
+        name: "",
+        description: "",
+        tracks: [],
+      };
+      let savedPlaylists = [];
+      let editMode = false;
+
+      // Initialize
+      init();
+
+      function init() {
+        // Load tracks from the audio directory
+        loadAvailableTracks();
+
+        // Load existing playlists
+        loadSavedPlaylists();
+
+        // Setup event listeners
+        setupEventListeners();
+
+        // Set up tabs
+        setupTabs();
+      }
+
+      function setupTabs() {
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            // Remove active class from all tabs and contents
+            tabs.forEach((t) => t.classList.remove("active"));
+            tabContents.forEach((c) => c.classList.remove("active"));
+
+            // Add active class to clicked tab and corresponding content
+            tab.classList.add("active");
+            const tabId = tab.dataset.tab;
+            document.getElementById(`${tabId}Tab`).classList.add("active");
+
+            // If switching to saved playlists tab, render the saved playlists
+            if (tabId === "saved") {
+              renderSavedPlaylists();
+            }
+          });
+        });
+      }
+
+      function loadAvailableTracks() {
+        // Mock function to simulate loading tracks from the server
+        // In a real implementation, you would make an AJAX request to the server
+        // to get a list of audio files in the audio directory
+
+        // For demo purposes, we'll define some sample tracks
+        availableTracks = [
+          {
+            id: 1,
+            title: "Summer Vibes",
+            artist: "DJ Sunshine",
+            filename: "summer_vibes.mp3",
+          },
+          {
+            id: 2,
+            title: "Midnight Drive",
+            artist: "Night Cruiser",
+            filename: "midnight_drive.mp3",
+          },
+          {
+            id: 3,
+            title: "Mountain High",
+            artist: "Peak Climbers",
+            filename: "mountain_high.mp3",
+          },
+          {
+            id: 4,
+            title: "Ocean Waves",
+            artist: "Coastal Dreams",
+            filename: "ocean_waves.mp3",
+          },
+          {
+            id: 5,
+            title: "City Lights",
+            artist: "Urban Explorers",
+            filename: "city_lights.mp3",
+          },
+        ];
+        renderTrackList();
+
+        // In a real implementation, you would fetch the tracks from a server
+        // For example:
+        /*
+        fetch("available_tracks.json")
+          .then((response) => response.json())
+          .then((data) => {
+            availableTracks = data;
+            renderTrackList();
+          })
+          .catch((error) => console.error("Error loading tracks:", error));
+        */
+      }
+
+      function renderTrackList(filter = "") {
+        // Clear the list
+        trackList.innerHTML = "";
+
+        // Filter tracks based on search input
+        const filteredTracks = availableTracks.filter(
+          (track) =>
+            track.title.toLowerCase().includes(filter.toLowerCase()) ||
+            track.artist.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        if (filteredTracks.length === 0) {
+          trackList.innerHTML = `
+            <li class="track-item">
+                <div class="track-info">
+                    <div class="track-title">No tracks found</div>
+                </div>
+            </li>
+          `;
+          return;
+        }
+
+        // Add each track to the list
+        filteredTracks.forEach((track) => {
+          const li = document.createElement("li");
+          li.className = "track-item";
+          li.innerHTML = `
+            <div class="track-info">
+                <div class="track-title">${track.title}</div>
+                <div class="track-artist">${track.artist}</div>
+            </div>
+            <div class="track-actions">
+                <button class="preview" data-filename="${track.filename}">Preview</button>
+                <button class="add" data-track-id="${track.id}">Add</button>
+            </div>
+          `;
+          trackList.appendChild(li);
+        });
+
+        // Add event listeners to buttons
+        trackList.querySelectorAll(".preview").forEach((button) => {
+          button.addEventListener("click", () => {
+            const filename = button.dataset.filename;
+            previewTrack(filename);
+          });
+        });
+
+        trackList.querySelectorAll(".add").forEach((button) => {
+          button.addEventListener("click", () => {
+            const trackId = parseInt(button.dataset.trackId);
+            addTrackToPlaylist(trackId);
+          });
+        });
+      }
+
+      function previewTrack(filename) {
+        // In a real implementation, the audio file would be loaded from a server
+        // For demo purposes, we'll just show a message
+        showMessage(`Playing ${filename} (demo)`, "success");
+        
+        // This would be the actual implementation:
+        // audioPreview.src = `audio/${filename}`;
+        // audioPreview.play().catch((error) => {
+        //   showMessage(`Error playing track: ${error.message}`, "error");
+        // });
+      }
+
+      function addTrackToPlaylist(trackId) {
+        const track = availableTracks.find((t) => t.id === trackId);
+
+        if (!track) {
+          showMessage("Track not found", "error");
+          return;
+        }
+
+        // Check if track is already in the playlist
+        if (currentPlaylist.tracks.some((t) => t.id === trackId)) {
+          showMessage("Track is already in the playlist", "error");
+          return;
+        }
+
+        // Add track to the playlist
+        currentPlaylist.tracks.push({
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          filename: track.filename,
+        });
+
+        renderPlaylist();
+        showMessage(`Added "${track.title}" to the playlist`, "success");
+      }
+
+      function renderPlaylist() {
+        // Clear the list
+        playlistTracks.innerHTML = "";
+
+        if (currentPlaylist.tracks.length === 0) {
+          playlistTracks.innerHTML = `
+            <li class="playlist-item empty-message">
+                <div class="track-info">
+                    <div class="track-title">No tracks added yet</div>
+                </div>
+            </li>
+          `;
+          return;
+        }
+
+        // Add each track to the list
+        currentPlaylist.tracks.forEach((track, index) => {
+          const li = document.createElement("li");
+          li.className = "playlist-item";
+          li.draggable = true;
+          li.dataset.index = index;
+          li.innerHTML = `
+            <span class="drag-handle">☰</span>
+            <div class="track-info">
+                <div class="track-title">${track.title}</div>
+                <div class="track-artist">${track.artist}</div>
+            </div>
+            <div class="track-actions">
+                <button class="preview" data-filename="${track.filename}">Preview</button>
+                <button class="remove" data-index="${index}">Remove</button>
+            </div>
+          `;
+          playlistTracks.appendChild(li);
+        });
+
+        // Add event listeners to buttons
+        playlistTracks.querySelectorAll(".preview").forEach((button) => {
+          button.addEventListener("click", () => {
+            const filename = button.dataset.filename;
+            previewTrack(filename);
+          });
+        });
+
+        playlistTracks.querySelectorAll(".remove").forEach((button) => {
+          button.addEventListener("click", () => {
+            const index = parseInt(button.dataset.index);
+            removeTrackFromPlaylist(index);
+          });
+        });
+
+        // Setup drag and drop functionality
+        setupDragAndDrop();
+      }
+
+      function removeTrackFromPlaylist(index) {
+        if (index < 0 || index >= currentPlaylist.tracks.length) {
+          return;
+        }
+
+        const removedTrack = currentPlaylist.tracks[index];
+        currentPlaylist.tracks.splice(index, 1);
+
+        renderPlaylist();
+        showMessage(
+          `Removed "${removedTrack.title}" from the playlist`,
+          "success"
+        );
+      }
+
+      function setupDragAndDrop() {
+        const items = playlistTracks.querySelectorAll(".playlist-item");
+
+        items.forEach((item) => {
+          item.addEventListener("dragstart", () => {
+            item.classList.add("dragging");
+            // Store the index of the dragged item
+            item.setAttribute("data-dragging-index", item.dataset.index);
+          });
+
+          item.addEventListener("dragend", () => {
+            item.classList.remove("dragging");
+          });
+
+          item.addEventListener("dragover", (e) => {
+            e.preventDefault();
+          });
+
+          item.addEventListener("drop", (e) => {
+            e.preventDefault();
+
+            // Get the indices of the dragged and target items
+            const draggedIndex = parseInt(
+              document.querySelector(".dragging").dataset.draggingIndex
+            );
+            const targetIndex = parseInt(item.dataset.index);
+
+            if (draggedIndex !== targetIndex) {
+              // Reorder the tracks in the playlist
+              const draggedTrack = currentPlaylist.tracks[draggedIndex];
+              currentPlaylist.tracks.splice(draggedIndex, 1);
+              currentPlaylist.tracks.splice(targetIndex, 0, draggedTrack);
+
+              renderPlaylist();
+            }
+          });
+        });
+      }
+
+      function loadSavedPlaylists() {
+        // Load playlists from localStorage
+        const savedPlaylistsJson = localStorage.getItem("savedPlaylists");
+        if (savedPlaylistsJson) {
+          try {
+            savedPlaylists = JSON.parse(savedPlaylistsJson);
+            showMessage("Loaded saved playlists", "success");
+          } catch (error) {
+            console.error("Error parsing saved playlists:", error);
+            savedPlaylists = [];
+            showMessage("Error loading saved playlists", "error");
+          }
+        }
+      }
+
+      function renderSavedPlaylists() {
+        // Clear the list
+        savedPlaylistsList.innerHTML = "";
+
+        if (savedPlaylists.length === 0) {
+          savedPlaylistsList.innerHTML = `
+            <li class="saved-playlist-item empty-message">
+                <div class="saved-playlist-info">
+                    <div class="saved-playlist-name">No saved playlists</div>
+                </div>
+            </li>
+          `;
+          return;
+        }
+
+        // Add each playlist to the list
+        savedPlaylists.forEach((playlist, index) => {
+          const li = document.createElement("li");
+          li.className = "saved-playlist-item";
+          li.innerHTML = `
+            <div class="saved-playlist-info">
+                <div class="saved-playlist-name">${playlist.name}</div>
+                <div class="saved-playlist-description">${playlist.description || "No description"}</div>
+                <div class="saved-playlist-tracks">${playlist.tracks.length} tracks</div>
+            </div>
+            <div class="saved-playlist-actions">
+                <button class="edit" data-playlist-id="${playlist.id}">Edit</button>
+                <button class="remove" data-index="${index}">Delete</button>
+            </div>
+          `;
+          savedPlaylistsList.appendChild(li);
+        });
+
+        // Add event listeners to buttons
+        savedPlaylistsList.querySelectorAll(".edit").forEach((button) => {
+          button.addEventListener("click", () => {
+            const playlistId = button.dataset.playlistId;
+            editPlaylist(playlistId);
+          });
+        });
+
+        savedPlaylistsList.querySelectorAll(".remove").forEach((button) => {
+          button.addEventListener("click", () => {
+            const index = parseInt(button.dataset.index);
+            deletePlaylist(index);
+          });
+        });
+      }
+
+      function editPlaylist(playlistId) {
+        const playlist = savedPlaylists.find((p) => p.id === playlistId);
+        if (!playlist) {
+          showMessage("Playlist not found", "error");
+          return;
+        }
+
+        // Set current playlist to the selected one
+        currentPlaylist = {
+          id: playlist.id,
+          name: playlist.name,
+          description: playlist.description || "",
+          tracks: playlist.tracks.map(track => {
+            // Convert saved track format to current playlist format
+            const availableTrack = availableTracks.find(t => 
+              t.filename === track.file || 
+              (t.title === track.title && t.artist === track.artist)
+            );
+            
+            return {
+              id: availableTrack ? availableTrack.id : generateId(),
+              title: track.title,
+              artist: track.artist,
+              filename: track.file
+            };
+          })
+        };
+
+        // Update form fields
+        playlistName.value = currentPlaylist.name;
+        playlistDescription.value = currentPlaylist.description;
+
+        // Render tracks
+        renderPlaylist();
+
+        // Switch to create tab
+        document.querySelector('.tab[data-tab="create"]').click();
+        
+        // Set edit mode
+        editMode = true;
+        savePlaylistBtn.textContent = "Update Playlist";
+        
+        showMessage(`Editing playlist "${playlist.name}"`, "success");
+      }
+
+      function deletePlaylist(index) {
+        if (index < 0 || index >= savedPlaylists.length) {
+          return;
+        }
+
+        const deletedPlaylist = savedPlaylists[index];
+        savedPlaylists.splice(index, 1);
+
+        // Save to localStorage
+        localStorage.setItem("savedPlaylists", JSON.stringify(savedPlaylists));
+
+        renderSavedPlaylists();
+        showMessage(`Deleted playlist "${deletedPlaylist.name}"`, "success");
+      }
+
+      function saveCurrentPlaylist() {
+        const name = playlistName.value.trim();
+        const description = playlistDescription.value.trim();
+
+        if (!name) {
+          showMessage("Please enter a playlist name", "error");
+          return;
+        }
+
+        if (currentPlaylist.tracks.length === 0) {
+          showMessage("Please add at least one track to the playlist", "error");
+          return;
+        }
+
+        // Create new playlist object
+        const playlist = {
+          id: currentPlaylist.id || generateId(),
+          name: name,
+          description: description,
+          tracks: currentPlaylist.tracks.map((track) => ({
+            title: track.title,
+            artist: track.artist,
+            file: track.filename,
+          })),
+        };
+
+        if (editMode) {
+          // Update existing playlist
+          const existingIndex = savedPlaylists.findIndex((p) => p.id === playlist.id);
+          if (existingIndex !== -1) {
+            savedPlaylists[existingIndex] = playlist;
+            showMessage(`Updated playlist "${name}"`, "success");
+          } else {
+            // In case the ID doesn't exist for some reason, add as new
+            savedPlaylists.push(playlist);
+            showMessage(`Saved playlist "${name}"`, "success");
+          }
+          
+          // Reset edit mode
+          editMode = false;
+          savePlaylistBtn.textContent = "Save Playlist";
+        } else {
+          // Check if a playlist with the same name already exists
+          const existingIndex = savedPlaylists.findIndex((p) => p.name === name);
+          if (existingIndex !== -1) {
+            if (confirm(`A playlist named "${name}" already exists. Do you want to replace it?`)) {
+              savedPlaylists[existingIndex] = playlist;
+              showMessage(`Updated playlist "${name}"`, "success");
+            } else {
+              return;
+            }
+          } else {
+            // Add new playlist
+            savedPlaylists.push(playlist);
+            showMessage(`Saved playlist "${name}"`, "success");
+          }
+        }
+
+        // Save to localStorage
+        localStorage.setItem("savedPlaylists", JSON.stringify(savedPlaylists));
+        
+        // Reset current playlist
+        resetCurrentPlaylist();
+      }
+
+      function resetCurrentPlaylist() {
+        currentPlaylist = {
+          id: null,
+          name: "",
+          description: "",
+          tracks: [],
+        };
+        
+        // Clear form fields
+        playlistName.value = "";
+        playlistDescription.value = "";
+        
+        // Reset edit mode if active
+        if (editMode) {
+          editMode = false;
+          savePlaylistBtn.textContent = "Save Playlist";
+        }
+        
+        // Render empty playlist
+        renderPlaylist();
+      }
+
+      function clearPlaylist() {
+        // Ask for confirmation
+        if (currentPlaylist.tracks.length > 0) {
+          if (!confirm("Are you sure you want to clear the current playlist?")) {
+            return;
+          }
+        }
+        
+        resetCurrentPlaylist();
+        showMessage("Playlist cleared", "success");
+      }
+
+      function downloadPlaylistJson() {
+        const name = playlistName.value.trim();
+        const description = playlistDescription.value.trim();
+
+        if (!name) {
+          showMessage("Please enter a playlist name", "error");
+          return;
+        }
+
+        if (currentPlaylist.tracks.length === 0) {
+          showMessage("Please add at least one track to the playlist", "error");
+          return;
+        }
+
+        // Create playlist object for download
+        const playlist = {
+          id: currentPlaylist.id || generateId(),
+          name: name,
+          description: description,
+          tracks: currentPlaylist.tracks.map((track) => ({
+            title: track.title,
+            artist: track.artist,
+            file: track.filename,
+          })),
+        };
+
+        // Create a JSON blob and download it
+        const playlistJson = JSON.stringify([playlist], null, 2);
+        const blob = new Blob([playlistJson], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${name.replace(/\s+/g, "_").toLowerCase()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showMessage(`Downloaded playlist "${name}"`, "success");
+      }
+
+      function showMessage(message, type) {
+        const div = document.createElement("div");
+        div.className = `message ${type}`;
+        div.textContent = message;
+
+        messageArea.innerHTML = "";
+        messageArea.appendChild(div);
+
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          div.remove();
+        }, 3000);
+      }
+
+      function generateId() {
+        return (
+          Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+        );
+      }
+
+      function setupEventListeners() {
+        // Search input
+        searchInput.addEventListener("input", () => {
+          renderTrackList(searchInput.value);
+        });
+
+        // Save playlist button
+        savePlaylistBtn.addEventListener("click", saveCurrentPlaylist);
+
+        // Clear playlist button
+        clearPlaylistBtn.addEventListener("click", clearPlaylist);
+
+        // Download playlist button
+        downloadPlaylistBtn.addEventListener("click", downloadPlaylistJson);
+      }
+    </script>
+  </body>
+</html>

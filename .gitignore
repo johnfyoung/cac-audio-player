@@ -1,0 +1,8 @@
+.DS_Store
+_notes.md
+audio/*
+playlists/*
+*.json
+.env
+node_modules
+_work
