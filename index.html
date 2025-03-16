@@ -5,6 +5,58 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mossback Suns Audio Player</title>
     <link rel="icon" type="image/png" href="favicon.png" />
+    <!-- Add these meta tags in the head section, right after the existing meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Mossback Suns Player" />
+    <!-- iOS PWA specific -->
+    <!-- Add these Apple-specific icon tags right after your existing meta tags -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="152x152"
+      href="icons/icon-152x152.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="icons/icon-180x180.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="167x167"
+      href="icons/icon-167x167.png"
+    />
+
+    <!-- Apple splash screen images for different devices -->
+    <!-- iPhone X (1125px x 2436px) -->
+    <link
+      rel="apple-touch-startup-image"
+      media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
+      href="icons/splash-1125x2436.png"
+    />
+    <!-- iPhone 8, 7, 6s, 6 (750px x 1334px) -->
+    <link
+      rel="apple-touch-startup-image"
+      media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+      href="icons/splash-750x1334.png"
+    />
+    <!-- iPhone 8 Plus, 7 Plus, 6s Plus, 6 Plus (1242px x 2208px) -->
+    <link
+      rel="apple-touch-startup-image"
+      media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)"
+      href="icons/splash-1242x2208.png"
+    />
+    <!-- iPad Pro 12.9" (2048px x 2732px) -->
+    <link
+      rel="apple-touch-startup-image"
+      media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+      href="icons/splash-2048x2732.png"
+    />
+    <!-- Add this for Android -->
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="manifest.json" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -479,7 +531,7 @@
         <canvas id="mobileWaveformCanvas"></canvas>
       </div>
       <div class="mobile-player-info">
-        <img src="mossback_logo.png" alt="mossback suns log" />
+        <img src="audio-player-logo.png" alt="mossback suns log" />
         <div id="mobileNowPlaying">Select a playlist</div>
       </div>
       <div class="mobile-player-controls">
@@ -783,6 +835,49 @@
         connectAudioToAnalyser();
       }
 
+      // Function to set up MediaSession API
+      function setupMediaSession() {
+        if ("mediaSession" in navigator) {
+          const track = currentPlaylist.tracks[currentTrackIndex];
+
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: track.title,
+            artist: "Mossback Suns",
+            album: currentPlaylist.name,
+            artwork: [
+              { src: "mossback_logo.png", sizes: "96x96", type: "image/png" },
+              {
+                src: "audio-player-logo.png",
+                sizes: "128x128",
+                type: "image/png",
+              },
+            ],
+          });
+
+          // Set up media session action handlers
+          navigator.mediaSession.setActionHandler("play", () => {
+            if (!isPlaying) togglePlayPause();
+          });
+
+          navigator.mediaSession.setActionHandler("pause", () => {
+            if (isPlaying) togglePlayPause();
+          });
+
+          navigator.mediaSession.setActionHandler("previoustrack", () => {
+            if (!prevBtn.disabled) playPreviousTrack();
+          });
+
+          navigator.mediaSession.setActionHandler("nexttrack", () => {
+            if (!nextBtn.disabled) playNextTrack();
+          });
+
+          // Update playback state
+          navigator.mediaSession.playbackState = isPlaying
+            ? "playing"
+            : "paused";
+        }
+      }
+
       // Initialize
       init();
 
@@ -883,9 +978,10 @@
         // Set the audio source
         audioElement.src = `audio/${track.file}`;
 
-        // For iOS Safari: set audio attributes
+        // Configure audio element for background playback
         audioElement.setAttribute("playsinline", "");
         audioElement.setAttribute("webkit-playsinline", "");
+        audioElement.setAttribute("preload", "auto");
 
         // Update now playing
         nowPlaying.textContent = `Now Playing: ${track.title}`;
@@ -900,10 +996,12 @@
           .then(() => {
             isPlaying = true;
             updatePlayerState();
+            setupMediaSession();
 
             // Initialize audio visualization
             setTimeout(() => {
               initAudioVisualization();
+              setupMediaSession();
             }, 100);
           })
           .catch((error) => {
@@ -1155,6 +1253,84 @@
           false
         );
       });
+
+      // Handle visibilitychange events
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          // Page is hidden (device locked or app in background)
+          if (isPlaying) {
+            // Ensure playback continues - this is a hint to the browser
+            audioElement
+              .play()
+              .catch((e) => console.log("Background play attempt:", e));
+          }
+        }
+      });
+
+      // Handle interruptions like phone calls, alarms, etc.
+      audioElement.addEventListener("pause", () => {
+        // Check if the pause was triggered by system (not by user)
+        if (isPlaying) {
+          // Try to resume playback after a brief delay
+          setTimeout(() => {
+            audioElement.play().catch((e) => {
+              console.log("Resume after interruption failed:", e);
+              isPlaying = false;
+              updatePlayerState();
+            });
+          }, 500);
+        }
+      });
+
+      // Register service worker for PWA support
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {
+              console.log(
+                "ServiceWorker registration successful with scope: ",
+                registration.scope
+              );
+            })
+            .catch((error) => {
+              console.log("ServiceWorker registration failed: ", error);
+            });
+        });
+      }
+
+      // Enable wakeLock API if available (keeps screen on during playback)
+      let wakeLock = null;
+      async function requestWakeLock() {
+        if ("wakeLock" in navigator) {
+          try {
+            wakeLock = await navigator.wakeLock.request("screen");
+            wakeLock.addEventListener("release", () => {
+              console.log("Wake Lock was released");
+            });
+            console.log("Wake Lock is active");
+          } catch (err) {
+            console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+          }
+        }
+      }
+
+      // Release wake lock when not playing
+      function releaseWakeLock() {
+        if (wakeLock !== null) {
+          wakeLock.release().then(() => {
+            wakeLock = null;
+          });
+        }
+      }
+
+      // Modify your togglePlayPause function to handle wake lock
+      // Add this to the togglePlayPause function after the isPlaying check
+      if (isPlaying) {
+        requestWakeLock(); // Request wake lock when playing
+      } else {
+        releaseWakeLock(); // Release wake lock when paused
+      }
     </script>
   </body>
 </html>
