@@ -16,7 +16,7 @@ fi
 S3_BUCKET=${S3_BUCKET}
 HTML_FILE="index.html"
 AUDIO_DIR="./audio"
-TRACKS_JSON="available_tracks.json"
+ICONS_DIR="./icons"
 LOGO_FILE="audio-player-logo.png"
 FAVICON="favicon.png"
 PLAYLISTS_JSON="playlists.json"
@@ -37,11 +37,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -a|--audio-dir)
             AUDIO_DIR="$2"
-            shift
-            shift
-            ;;
-        -t|--tracks)
-            TRACKS_JSON="$2"
             shift
             shift
             ;;
@@ -66,7 +61,6 @@ while [[ $# -gt 0 ]]; do
             echo "  -b, --bucket BUCKET   Specify the S3 bucket (default: s3://cac-audio-player)"
             echo "  -h, --html FILE       Specify the HTML file (default: index.html)"
             echo "  -a, --audio-dir DIR   Specify the audio directory (default: ./audio)"
-            echo "  -t, --tracks FILE     Specify the tracks JSON file (default: available_tracks.json)"
             echo "  -l, --logo FILE       Specify the logo file (default: mossback_logo.png)"
             echo "  -i, --icon FILE       Specify the favicon (default: favicon.png)"
             echo "  -p, --playlists FILE  Specify the playlists JSON file (default: playlists.json)"
@@ -106,7 +100,7 @@ if [ ! -d "$AUDIO_DIR" ]; then
     exit 1
 fi
 
-if [ ! -f "$TRACKS_JSON" ]; then
+if [ ! -f "$ICONS_DIR" ]; then
     echo "Warning: Tracks JSON file '$TRACKS_JSON' does not exist."
 fi
 
@@ -139,6 +133,11 @@ sync_audio_dir() {
     aws s3 sync "$AUDIO_DIR" "$S3_BUCKET/audio" --content-type "audio/mpeg"
 }
 
+sync_icons_dir() {
+    echo "Uploading audio files from $ICONS_DIR..."
+    aws s3 sync "$ICONS_DIR" "$S3_BUCKET/icons" --content-type "audio/mpeg"
+}
+
 # Upload files with appropriate content types
 echo "Starting upload to $S3_BUCKET..."
 
@@ -146,8 +145,13 @@ echo "Starting upload to $S3_BUCKET..."
 sync_file "$HTML_FILE" "text/html"
 
 # Upload JSON files
-sync_file "$TRACKS_JSON" "application/json"
 sync_file "$PLAYLISTS_JSON" "application/json"
+
+# Upload manifest files
+sync_file "manifest.json" "application/json"
+
+# Upload service-worker files
+sync_file "service-worker.js" "application/javascript"
 
 # Upload logo
 if [[ "$LOGO_FILE" == *.png ]]; then
@@ -164,6 +168,9 @@ sync_file "$FAVICON" "image/png"
 
 # Sync audio directory
 sync_audio_dir
+
+# Sync audio directory
+sync_icons_dir
 
 echo "Upload completed successfully!"
 echo "Your audio player should be accessible at: https://$(echo $S3_BUCKET | cut -d/ -f3)/index.html"
