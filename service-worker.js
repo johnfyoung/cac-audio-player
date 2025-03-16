@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE_NAME = "mossback-player-v1";
+const CACHE_NAME = "cac-audio-player-v1";
 const urlsToCache = [
   "/",
   "/index.html",
